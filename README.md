@@ -5,7 +5,7 @@
 ## Theory of Operation
 
 - Game identified by release/serial combination (ie "59.860730" for Leather Goddesses)
-- Image fetched by URL format https://domain/print/<game ID>/<address>/<format>
+- Image fetched by URL format `https://domain/print/<game ID>/<address>/<format>`
 
 So that https://zmcdn.ballmerpeak.org/59.860730/0x5f63/sixel will fetch the introduction text for Leather Goddesses in Sixel format, suitable for dumping to most terminal programs (say iTerm2 but not Apple Terminal.app).
 
