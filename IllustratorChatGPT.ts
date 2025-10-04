@@ -1,5 +1,16 @@
 import OpenAI from "openai";
 import fs from "node:fs";
+import fetch, { Headers, Request, Response } from "node-fetch";
+import FormData from "form-data";
+
+// Polyfill globals for OpenAI client
+if (!globalThis.fetch) {
+  (globalThis as any).fetch = fetch;
+  (globalThis as any).Headers = Headers;
+  (globalThis as any).Request = Request;
+  (globalThis as any).Response = Response;
+  (globalThis as any).FormData = FormData;
+}
 
 export class IllustratorChatGPT {
   private client: OpenAI;
@@ -16,25 +27,37 @@ export class IllustratorChatGPT {
    */
   async generateImage(
     prompt: string,
-    size: "512x512" | "1024x1024" | "1024x1536" | "1536x1024" = "1024x1024",
+    size: "1024x1024" | "1792x1024" | "1024x1792" = "1024x1024",
     saveToFile?: string,
   ): Promise<string> {
     const resp = await this.client.images.generate({
       model: "gpt-image-1",
       prompt,
       size,
-      response_format: saveToFile ? "b64_json" : "url",
     });
 
-    // If saving locally, decode and write to disk
-    if (saveToFile) {
-      const b64 = resp.data[0].b64_json;
-      const buffer = Buffer.from(b64!, "base64");
-      fs.writeFileSync(saveToFile, buffer);
-      return `Saved image to ${saveToFile}`;
+    // Check if we got base64 data or URL
+    const imageData = resp.data?.[0];
+    if (!imageData) {
+      throw new Error("No image data returned");
     }
 
-    // Otherwise return the URL
-    return resp.data[0].url!;
+    // Handle base64 data
+    if (imageData.b64_json) {
+      const buffer = Buffer.from(imageData.b64_json, "base64");
+      if (saveToFile) {
+        fs.writeFileSync(saveToFile, buffer);
+        return `Saved image to ${saveToFile}`;
+      }
+      // Return as data URI if no save path
+      return `data:image/png;base64,${imageData.b64_json}`;
+    }
+
+    // Handle URL
+    if (imageData.url) {
+      return imageData.url;
+    }
+
+    throw new Error("No image URL or data returned");
   }
 }
