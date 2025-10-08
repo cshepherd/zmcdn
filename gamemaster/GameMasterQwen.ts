@@ -5,9 +5,11 @@ export class GameMasterQwen {
   private apiKey: string;
   private lastAnswers: string[] = [];
   private readonly maxAnswerHistory = 8;
+  private trace: boolean;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, trace: boolean = false) {
     this.apiKey = apiKey;
+    this.trace = trace;
   }
 
   /**
@@ -21,7 +23,7 @@ export class GameMasterQwen {
     lastZMachineInput: string;
     lastZMachineOutput: string;
   }): Promise<string> {
-    const gameMasterPrompt = `/no_think You are the Art Director for retro fantasy pixel art.
+    const gameMasterPrompt = process.env.GAME_MASTER_PROMPT || `/no_think You are the Art Director for retro fantasy pixel art.
 Given JSON scene state, produce:
 1) visual_prompt: a concise text-to-image prompt (≤ 220 chars) focusing only on visible elements.
 2) reuse_key: a deterministic key for caching (room + time + key objects).
@@ -51,6 +53,10 @@ Return JSON only.
       role: "user",
       content: `${JSON.stringify(sceneState)}`,
     });
+
+    if (this.trace) {
+      console.log(JSON.stringify(messages, null, 2));
+    }
 
     const response = await fetch(
       "https://api.deepinfra.com/v1/openai/chat/completions",

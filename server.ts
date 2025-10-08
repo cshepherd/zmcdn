@@ -17,6 +17,9 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 // Global trace flag
 let trace = false;
 
+// Global GameMasterQwen instance to maintain history across requests
+let gameMaster: GameMasterQwen | null = null;
+
 // Custom logging function that respects trace flag
 function traceLog(...args: any[]) {
   if (trace) {
@@ -110,8 +113,12 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
   };
 
   try {
+    // Initialize GameMasterQwen instance if not already created
+    if (!gameMaster) {
+      gameMaster = new GameMasterQwen(gameMasterAPIKey, trace);
+    }
+
     // Use GameMasterQwen to generate scene direction
-    const gameMaster = new GameMasterQwen(gameMasterAPIKey);
     const filteredContent = await gameMaster.generateSceneDirection(sceneState);
     traceLog(filteredContent);
 
