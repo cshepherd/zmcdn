@@ -12,7 +12,7 @@ if (!globalThis.fetch) {
   (globalThis as any).FormData = FormData;
 }
 
-export class IllustratorChatGPT {
+export class IllustratorOpenAI {
   private client: OpenAI;
 
   constructor(apiKey: string) {
