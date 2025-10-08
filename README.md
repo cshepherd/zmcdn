@@ -27,6 +27,16 @@ We convert that PNG image to Sixel format, so TSZM can dump it out to a terminal
 ## Current Status
 08-Oct-2025: As more focus shifts to ZMCDN, it got a much-needed refactor and documentation update.
 
+## When ZMCDN is invoked with `-i`, an interactive REPL lets you fiddle with things while it runs. You get commands like:
+```
+zmcdn> help
+Available commands:
+  trace on  - Enable trace logging
+  trace off - Disable trace logging
+  help      - Show this help message
+  exit      - Shutdown server and exit
+```
+
 ## Public ZMCDN Server
 
 `http://zmcdn.ballmerpeak.org:3003`
