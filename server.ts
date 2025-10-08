@@ -91,6 +91,11 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "missing required JSON parameters" });
   }
 
+  // Validate gameIdentifier to prevent directory traversal attacks
+  if (!/^[a-zA-Z0-9.]+$/.test(gameIdentifier)) {
+    return res.status(400).json({ error: "invalid gameIdentifier format" });
+  }
+
   // Get Game Master API key from environment
   const gameMasterAPIKey = process.env.GAMEMASTER_API_KEY;
   if (!gameMasterAPIKey) {
