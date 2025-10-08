@@ -3,9 +3,12 @@ import path from "path";
 import fs from "fs";
 import { GameMasterQwen } from "./gamemaster/GameMasterQwen";
 import { IllustratorFLUX } from "./illustrator/IllustratorFLUX";
+import dotenv from 'dotenv'
+
 const { loadImage, createCanvas } = require("canvas");
 const { image2sixel } = require("sixel");
 
+dotenv.config();
 const app = express();
 app.use(express.json());
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -99,9 +102,16 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     const illustrator = new IllustratorFLUX(gameMasterAPIKey);
     const b64Image = await illustrator.generateImage(filteredContent);
 
-    // Decode base64 image and convert to Sixel
+    // Decode base64 image
     const imageBuffer = Buffer.from(b64Image, "base64");
 
+    // If PNG format is requested, return image data directly
+    if (illustrationFormat === 'png') {
+      res.setHeader("Content-Type", "image/png");
+      return res.send(imageBuffer);
+    }
+
+    // Otherwise, convert to Sixel
     // Write temporary file for sixel conversion
     const tempImagePath = path.join(
       __dirname,
