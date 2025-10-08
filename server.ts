@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import readline from "readline";
 import { GameMasterQwen } from "./gamemaster/GameMasterQwen";
 import { IllustratorFLUX } from "./illustrator/IllustratorFLUX";
 import dotenv from 'dotenv'
@@ -12,6 +13,16 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+
+// Global trace flag
+let trace = false;
+
+// Custom logging function that respects trace flag
+function traceLog(...args: any[]) {
+  if (trace) {
+    console.log(...args);
+  }
+}
 
 /**
  * Convert an image file to sixel format
@@ -30,7 +41,7 @@ async function imageToSixel(
   try {
     img = await loadImage(filename);
   } catch (e) {
-    console.error(`cannot load image "${filename}"`);
+    traceLog(`cannot load image "${filename}"`);
     return;
   }
   const canvas = createCanvas(img.width, img.height);
@@ -97,13 +108,46 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     // Use GameMasterQwen to generate scene direction
     const gameMaster = new GameMasterQwen(gameMasterAPIKey);
     const filteredContent = await gameMaster.generateSceneDirection(sceneState);
+    traceLog(filteredContent);
 
-    // Use IllustratorFLUX to generate image
-    const illustrator = new IllustratorFLUX(gameMasterAPIKey);
-    const b64Image = await illustrator.generateImage(filteredContent);
+    // Parse the JSON to check repaint flag and get reuse_key
+    let sceneData;
+    try {
+      sceneData = JSON.parse(filteredContent);
+    } catch (e) {
+      return res.status(500).json({ error: "Invalid JSON from game master" });
+    }
 
-    // Decode base64 image
-    const imageBuffer = Buffer.from(b64Image, "base64");
+    let imageBuffer: Buffer;
+
+    // Check if we should use cached image
+    if (sceneData.repaint === false && sceneData.reuse_key) {
+      const cachedImagePath = path.join(__dirname, "cache", gameIdentifier, `${sceneData.reuse_key}.png`);
+      if (fs.existsSync(cachedImagePath)) {
+        imageBuffer = fs.readFileSync(cachedImagePath);
+        traceLog(`Using cached image from: ${cachedImagePath}`);
+      } else {
+        traceLog(`Cache miss for: ${cachedImagePath}, generating new image`);
+        // Generate new image if cache doesn't exist
+        const illustrator = new IllustratorFLUX(gameMasterAPIKey);
+        const b64Image = await illustrator.generateImage(filteredContent);
+        imageBuffer = Buffer.from(b64Image, "base64");
+      }
+    } else {
+      // Generate new image
+      const illustrator = new IllustratorFLUX(gameMasterAPIKey);
+      const b64Image = await illustrator.generateImage(filteredContent);
+      imageBuffer = Buffer.from(b64Image, "base64");
+
+      // Save image to cache if repaint is true
+      if (sceneData.repaint === true && sceneData.reuse_key) {
+        const cacheDir = path.join(__dirname, "cache", gameIdentifier);
+        fs.mkdirSync(cacheDir, { recursive: true });
+        const cachedImagePath = path.join(cacheDir, `${sceneData.reuse_key}.png`);
+        fs.writeFileSync(cachedImagePath, imageBuffer);
+        traceLog(`Cached image to: ${cachedImagePath}`);
+      }
+    }
 
     // If PNG format is requested, return image data directly
     if (illustrationFormat === 'png') {
@@ -149,6 +193,62 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`zmcdn sample server listening on port ${PORT}`);
+
+  // Start REPL if -i flag is specified
+  if (process.argv.includes('-i')) {
+    startREPL();
+  }
 });
+
+function startREPL() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: 'zmcdn> '
+  });
+
+  console.log('Interactive mode enabled. Type "help" for commands.');
+  rl.prompt();
+
+  rl.on('line', (line: string) => {
+    const cmd = line.trim().toLowerCase();
+
+    switch (cmd) {
+      case 'trace on':
+        trace = true;
+        console.log('Trace enabled');
+        break;
+      case 'trace off':
+        trace = false;
+        console.log('Trace disabled');
+        break;
+      case 'help':
+        console.log('Available commands:');
+        console.log('  trace on  - Enable trace logging');
+        console.log('  trace off - Disable trace logging');
+        console.log('  help      - Show this help message');
+        console.log('  exit      - Shutdown server and exit');
+        console.log('  quit      - Shutdown server and exit');
+        break;
+      case 'exit':
+      case 'quit':
+        console.log('Shutting down server...');
+        rl.close();
+        process.exit(0);
+      case '':
+        // Empty line, just show prompt again
+        break;
+      default:
+        console.log(`Unknown command: ${line}`);
+        console.log('Type "help" for available commands');
+    }
+
+    rl.prompt();
+  });
+
+  rl.on('close', () => {
+    console.log('REPL closed');
+  });
+}
 
 export default app;

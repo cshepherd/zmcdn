@@ -52,9 +52,6 @@ Return JSON only.
       content: `${JSON.stringify(sceneState)}`,
     });
 
-    console.log("contacting Qwen");
-    console.log(JSON.stringify(messages));
-
     const response = await fetch(
       "https://api.deepinfra.com/v1/openai/chat/completions",
       {
@@ -102,11 +99,16 @@ Return JSON only.
           /<think>[\s\S]*?<\/think>/g,
           "",
         );
+        // Extract content between first { and last }
+        const firstBrace = filteredContent.indexOf('{');
+        const lastBrace = filteredContent.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          filteredContent = filteredContent.substring(firstBrace, lastBrace + 1);
+        }
       }
     } catch (e) {
       console.error("Failed to parse JSON response:", e);
     }
-    console.log("Game Master output:", filteredContent);
 
     // Store answer for context in future calls
     this.lastAnswers.push(filteredContent);

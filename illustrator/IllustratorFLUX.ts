@@ -42,7 +42,6 @@ export class IllustratorFLUX {
     }
 
     const imageResult = await response.json();
-    console.log("Image generated:", imageResult);
 
     if (
       !imageResult.data ||
