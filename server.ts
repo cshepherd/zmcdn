@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import readline from "readline";
+import crypto from "crypto";
 import { GameMasterQwen } from "./gamemaster/GameMasterQwen";
 import { IllustratorFLUX } from "./illustrator/IllustratorFLUX";
 import dotenv from 'dotenv'
@@ -88,6 +89,7 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     playerLocation,
     gameIdentifier,
     illustrationFormat,
+    invalidate,
   } = req.body;
 
   if (!zmcdnSessionID || !lastZMachineOutput || !gameIdentifier) {
@@ -105,6 +107,9 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "GAMEMASTER_API_KEY not configured" });
   }
 
+  // Generate hash of lastZMachineOutput
+  const lastOutputHash = crypto.createHash('sha512').update(lastZMachineOutput).digest('hex');
+
   const sceneState = {
     zmcdnSessionID,
     playerLocation,
@@ -113,13 +118,31 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
   };
 
   try {
-    // Initialize GameMasterQwen instance if not already created
-    if (!gameMaster) {
-      gameMaster = new GameMasterQwen(gameMasterAPIKey, trace);
+    // Check if we have cached scene direction for this output
+    const cachedSceneDirectionPath = path.join(__dirname, "cache", `${lastOutputHash}.txt`);
+    let filteredContent: string;
+    let usedCachedSceneDirection = false;
+
+    if (!invalidate && fs.existsSync(cachedSceneDirectionPath)) {
+      // Use cached scene direction
+      filteredContent = fs.readFileSync(cachedSceneDirectionPath, 'utf-8');
+      usedCachedSceneDirection = true;
+      traceLog(`Using cached scene direction from: ${cachedSceneDirectionPath}`);
+    } else {
+      // Initialize GameMasterQwen instance if not already created
+      if (!gameMaster) {
+        gameMaster = new GameMasterQwen(gameMasterAPIKey, trace);
+      }
+
+      // Use GameMasterQwen to generate scene direction
+      filteredContent = await gameMaster.generateSceneDirection(sceneState);
+
+      // Cache the scene direction
+      fs.mkdirSync(path.dirname(cachedSceneDirectionPath), { recursive: true });
+      fs.writeFileSync(cachedSceneDirectionPath, filteredContent);
+      traceLog(`Cached scene direction to: ${cachedSceneDirectionPath}`);
     }
 
-    // Use GameMasterQwen to generate scene direction
-    const filteredContent = await gameMaster.generateSceneDirection(sceneState);
     traceLog(filteredContent);
 
     // Parse the JSON to check repaint flag and get reuse_key
@@ -133,7 +156,8 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
     let imageBuffer: Buffer;
 
     // Check if we should use cached image
-    if (sceneData.repaint === false && sceneData.reuse_key) {
+    // If we used cached scene direction, always use cached image (ignore repaint flag)
+    if (!invalidate && sceneData.reuse_key && (usedCachedSceneDirection || sceneData.repaint === false)) {
       const cachedImagePath = path.join(__dirname, "cache", gameIdentifier, `${sceneData.reuse_key}.png`);
       if (fs.existsSync(cachedImagePath)) {
         imageBuffer = fs.readFileSync(cachedImagePath);
@@ -144,6 +168,12 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
         const illustrator = new IllustratorFLUX(gameMasterAPIKey);
         const b64Image = await illustrator.generateImage(filteredContent);
         imageBuffer = Buffer.from(b64Image, "base64");
+
+        // Save the newly generated image to cache
+        const cacheDir = path.join(__dirname, "cache", gameIdentifier);
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cachedImagePath, imageBuffer);
+        traceLog(`Cached image to: ${cachedImagePath}`);
       }
     } else {
       // Generate new image
@@ -151,8 +181,8 @@ app.post("/illustrateMove", async (req: Request, res: Response) => {
       const b64Image = await illustrator.generateImage(filteredContent);
       imageBuffer = Buffer.from(b64Image, "base64");
 
-      // Save image to cache if repaint is true
-      if (sceneData.repaint === true && sceneData.reuse_key) {
+      // Save image to cache if we have a reuse_key
+      if (sceneData.reuse_key) {
         const cacheDir = path.join(__dirname, "cache", gameIdentifier);
         fs.mkdirSync(cacheDir, { recursive: true });
         const cachedImagePath = path.join(cacheDir, `${sceneData.reuse_key}.png`);
