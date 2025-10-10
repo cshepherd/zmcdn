@@ -45,7 +45,7 @@ npm run build
 - Start the server:
 
 ```bash
-node dist/server.js
+node dist/server.js [ -i ]
 ```
 
 ## Reverse Proxy
@@ -60,8 +60,8 @@ To run the server behind an apache2 httpd reverse proxy to provide a TLS endpoin
         RewriteCond %{REQUEST_URI} ^/zmcdn//+
         RewriteRule ^/+(.+)$ /zmcdn/$1 [R=301,L]
 
-        ProxyPass        "http://127.0.0.1:3003/"
-        ProxyPassReverse "http://127.0.0.1:3003/"
+        ProxyPass        "http://127.0.0.1:3000/"
+        ProxyPassReverse "http://127.0.0.1:3000/"
     </Location>
 ```
 
