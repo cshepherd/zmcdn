@@ -24,6 +24,47 @@ The Illustrator, FLUX-1-schnell, transforms the JSON input into a PNG image for 
 
 We convert that PNG image to Sixel format, so TSZM can dump it out to a terminal.
 
+## Building
+
+**Prerequisites**
+- Node.js 22
+- nvm
+
+```bash
+cd zmcdn
+nvm use
+npm i
+npm run build
+```
+
+## Running
+
+- Copy .env.example to .env
+- Add a **deepinfra.com** API token to .env
+- Edit the listener port in .env if needed
+- Start the server:
+
+```bash
+node dist/server.js
+```
+
+## Reverse Proxy
+
+To run the server behind an apache2 httpd reverse proxy to provide a TLS endpoint or similar, you can use a Location block to rewrite the URLs so Node Express can parse them properly:
+
+```bash
+    <Location "/zmcdn/">
+        Require all granted
+        RewriteEngine On
+
+        RewriteCond %{REQUEST_URI} ^/zmcdn//+
+        RewriteRule ^/+(.+)$ /zmcdn/$1 [R=301,L]
+
+        ProxyPass        "http://127.0.0.1:3003/"
+        ProxyPassReverse "http://127.0.0.1:3003/"
+    </Location>
+```
+
 ## Current Status
 08-Oct-2025: As more focus shifts to ZMCDN, it got a much-needed refactor and documentation update.
 
