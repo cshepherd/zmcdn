@@ -83,4 +83,6 @@ Available commands:
 `http://zmcdn.ballmerpeak.org:3003`
 
 ## Credits
-- All code by Christopher Shepherd <node@js.contractors>
+- @cshepherd
+- @clambertus
+
