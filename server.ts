@@ -233,7 +233,7 @@ app.use((err: any, _req: Request, res: Response, _next: any) => {
   res.status(500).json({ error: "internal error" });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`zmcdn sample server listening on port ${PORT}`);
 
   // Start REPL if -i flag is specified
@@ -241,6 +241,9 @@ app.listen(PORT, '0.0.0.0', () => {
     startREPL();
   }
 });
+
+let rl: readline.Interface | undefined;
+let shuttingDown = false;
 
 function startREPL() {
   const rl = readline.createInterface({
@@ -285,12 +288,44 @@ function startREPL() {
         console.log('Type "help" for available commands');
     }
 
-    rl.prompt();
+    rl!.prompt();
   });
 
-  rl.on('close', () => {
-    console.log('REPL closed');
+  // Make Ctrl-C behave like "exit"
+  rl.on('SIGINT', () => {
+    console.log('\nCaught Ctrl-C. Shutting down (SIGINT)...');
+    gracefulShutdown('SIGINT');
   });
+
+  // handle Ctrl-D (EOF) in REPL as exit
+  rl.on('close', () => {
+    console.log('\nCaught Ctrl-D. Shutting down (EOF)...');
+    gracefulShutdown('EOF');
+  });
+
 }
+
+function gracefulShutdown(reason: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  // Stop accepting input
+  try { rl?.close(); } catch {}
+
+  // Stop accepting new connections; finish in-flight ones
+  server.close(() => {
+    console.log(`HTTP server closed (${reason}).`);
+    process.exit(0);
+  });
+
+  // Hard timeout in case something is stuck
+  setTimeout(() => {
+    console.warn('Force exiting after timeout.');
+    process.exit(1);
+  }, 2000).unref();
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 export default app;
