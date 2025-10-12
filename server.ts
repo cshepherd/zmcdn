@@ -69,6 +69,17 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 /**
+ * OPTIONS /illustrateMove
+ * Handle CORS preflight requests
+ */
+app.options("/illustrateMove", (_req: Request, res: Response) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.status(204).send();
+});
+
+/**
  * POST /illustrateMove
  * Accepts JSON: {
  *   zmcdnSessionID: string,
@@ -82,6 +93,11 @@ app.get("/health", (_req: Request, res: Response) => {
  * as well as scene illustration
  */
 app.post("/illustrateMove", async (req: Request, res: Response) => {
+  // Set CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   const {
     zmcdnSessionID,
     lastZMachineOutput,
